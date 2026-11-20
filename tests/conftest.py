@@ -254,15 +254,17 @@ def container(container_engine, image, workspace, clean_up):
             encoding="utf-8",
         ).stdout
     elif container_engine is ContainerEngine.PODMAN:
+        assert container_engine.sudo_required is False
         subprocess.run(
-            "tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24 | podman secret create postgres_password -",
+            f"tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24 | {container_engine.command_prefix} secret create postgres_password -",
             shell=True,
             check=True,
         )
         secret_args = ("--secret", "postgres_password,uid=584792,gid=584792,mode=400")
         password = subprocess.run(
             (
-                "podman",
+                *container_engine.sudo_prefix,
+                container_engine.command_prefix,
                 "secret",
                 "inspect",
                 "postgres_password",
@@ -331,3 +333,14 @@ def container(container_engine, image, workspace, clean_up):
         ),
         check=True,
     )
+    if container_engine is ContainerEngine.PODMAN:
+        subprocess.run(
+            (
+                *container_engine.sudo_prefix,
+                container_engine.command_prefix,
+                "secret",
+                "rm",
+                "postgres_password",
+            ),
+            check=True,
+        )
